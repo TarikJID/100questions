@@ -363,7 +363,7 @@ function renderHome() {
   </section>
 
   <nav class="modes" aria-label="Modes de jeu">
-    ${modeBtn("sim", "exam", "Simulation d'examen", "Une fiche au hasard, comme le jour J : une question de sécurité routière, puis une de premiers secours.")}
+    ${modeBtn("sim", "exam", "Simulation d'examen", "Une fiche au hasard, comme le jour J : la vérification du véhicule (à faire sur la voiture), puis une question de sécurité routière et une de premiers secours.")}
     ${modeBtn("train", "train", "Entraînement libre", "Une série de questions, filtrée par catégorie ou par type de vérification.")}
     ${modeBtn("errors", "errors", `Révision des erreurs${errCount ? `<span class="count">${errCount}</span>` : ""}`, errCount ? "Les questions ratées reviennent jusqu'à deux bonnes réponses d'affilée." : "Aucune erreur à revoir pour l'instant.")}
     ${modeBtn("browse", "browse", "Parcourir les fiches", "Les 100 fiches en lecture, avec une recherche.")}
@@ -503,7 +503,7 @@ function renderResult() {
   const missed = s.answers.filter(a => !a.ok).map(a => Q[a.id]);
   const pct = Math.round(good / total * 100);
   const msg = s.kind === "sim"
-    ? (good === 2 ? "Fiche réussie. Tu aurais obtenu les points de ces deux questions." : good === 1 ? "Une seule question réussie sur cette fiche." : "Aucune question réussie sur cette fiche.")
+    ? (good === 2 ? "Fiche réussie : tu aurais obtenu les 2 points de ces questions." : good === 1 ? "Une seule question réussie sur cette fiche." : "Aucune question réussie sur cette fiche.")
     : pct === 100 ? "Sans faute." : pct >= 70 ? "Bon résultat. Revois les questions ratées ci-dessous." : "Continue : les questions ratées reviendront dans « Révision des erreurs ».";
   const again = s.kind === "sim" ? "Nouvelle fiche" : s.kind === "errors" ? "Relancer la révision" : "Nouvelle série";
   return `
@@ -512,7 +512,7 @@ function renderResult() {
     <span class="eyebrow">${s.kind === "sim" ? `Fiche ${pad(s.fiche.n)} · ${VERIF[s.fiche.verif]}` : "Résultat de la série"}</span>
     <div class="score"><span class="big">${good}<small> / ${total}</small></span></div>
     <p>${msg}</p>
-    ${s.kind === "sim" ? `<p class="small muted">Le jour de l'examen, la vérification du véhicule elle-même est aussi évaluée. Elle n'est pas couverte ici.</p>` : ""}
+    ${s.kind === "sim" ? `<p class="small muted">Le jour de l'examen, cette partie compte 3 points : la vérification du véhicule (1 point), la question de sécurité routière (1 point) et la question de premiers secours (1 point). Le PDF ne détaille pas les vérifications à faire, donc ce 3<sup>e</sup> point n'est pas simulé ici.</p>` : ""}
     <div class="row">
       ${missed.length ? `<button class="btn" data-act="retry-missed" id="retry-missed">Revoir mes erreurs (${missed.length})</button>` : ""}
       <button class="btn ${missed.length ? "ghost" : ""}" data-act="again" id="again">${again}</button>
