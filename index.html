@@ -442,6 +442,7 @@ function renderHome() {
     ${modeBtn("train", "train", "Entraînement libre", "Une série de vérifications et de questions, filtrée par catégorie ou par type de vérification.")}
     ${modeBtn("errors", "errors", `Révision des erreurs${errCount ? `<span class="count">${errCount}</span>` : ""}`, errCount ? "Les questions ratées reviennent jusqu'à deux bonnes réponses d'affilée." : "Aucune erreur à revoir pour l'instant.")}
     ${modeBtn("browse", "browse", "Parcourir les fiches", "Les 100 fiches en lecture, avec une recherche.")}
+    ${modeBtn("selection", "browse", SEL_TITLE, "Ta sélection de 11 fiches, à relire ou à travailler en série.")}
   </nav>
 
   <section class="panel">
@@ -519,7 +520,7 @@ function prepQuestion() {
 /* ---------- Écran de question ---------- */
 function renderQuiz() {
   const s = session, q = Q[s.items[s.i]], total = s.items.length, done = s.picked !== null;
-  const title = s.kind === "sim" ? "Simulation d'examen" : s.kind === "errors" ? "Révision des erreurs" : "Entraînement libre";
+  const title = s.kind === "sim" ? "Simulation d'examen" : s.kind === "errors" ? "Révision des erreurs" : s.kind === "sel" ? SEL_TITLE : "Entraînement libre";
   let body;
   if (q.cat === "vf") {
     const isQuestion = q.q.trim().endsWith("?");
@@ -621,14 +622,6 @@ function renderBrowse() {
   const t = norm(browse.text.trim());
   const list = FICHES.filter(f => (browse.verif === "all" || f.verif === browse.verif) &&
     (!t || String(f.n) === t.replace(/^0+/, "") || [f.vf, f.sr, f.ps].some(id => norm(Q[id].q + " " + Q[id].a).includes(t))));
-  const qa = id => {
-    const q = Q[id], lv = level(id);
-    return `<div class="qa">
-      <i class="dot ${lv}" title="${LEVEL_LABEL[lv]}" aria-label="${LEVEL_LABEL[lv]}"></i>
-      <div><span class="lab ${q.cat}">${CAT[q.cat]}</span><p class="q">${esc(q.q)}</p></div>
-      <p class="ans ${browse.hide ? "hidden-ans" : ""}" ${browse.hide ? 'data-act="peek" title="Toucher pour afficher"' : ""}>${esc(answerText(q))}</p>
-    </div>`;
-  };
   return `
   <button class="back" data-act="home">‹ Accueil</button>
   <h2>Les 100 fiches</h2>
@@ -638,12 +631,40 @@ function renderBrowse() {
     <div class="seg"><button data-act="hide" aria-pressed="${browse.hide}" id="hide">Masquer les réponses</button></div>
   </div>
   <p class="small muted" id="bcount">${list.length} fiche${list.length > 1 ? "s" : ""}</p>
-  <div class="fiches" id="fiches">${list.map(f => `
-    <article class="fiche">
-      <div class="fiche-head"><span class="plate"><b>${pad(f.n)}</b>${VERIF[f.verif]}</span></div>
-      ${qa(f.vf)}${qa(f.sr)}${qa(f.ps)}
-    </article>`).join("") || `<p class="muted">Aucune fiche ne correspond à cette recherche.</p>`}</div>`;
+  <div class="fiches" id="fiches">${list.map(ficheCard).join("") || `<p class="muted">Aucune fiche ne correspond à cette recherche.</p>`}</div>`;
 }
+function qaBlock(id) {
+  const q = Q[id], lv = level(id);
+  return `<div class="qa">
+    <i class="dot ${lv}" title="${LEVEL_LABEL[lv]}" aria-label="${LEVEL_LABEL[lv]}"></i>
+    <div><span class="lab ${q.cat}">${CAT[q.cat]}</span><p class="q">${esc(q.q)}</p></div>
+    <p class="ans ${browse.hide ? "hidden-ans" : ""}" ${browse.hide ? 'data-act="peek" title="Toucher pour afficher"' : ""}>${esc(answerText(q))}</p>
+  </div>`;
+}
+const ficheCard = f => `
+  <article class="fiche">
+    <div class="fiche-head"><span class="plate"><b>${pad(f.n)}</b>${VERIF[f.verif]}</span></div>
+    ${qaBlock(f.vf)}${qaBlock(f.sr)}${qaBlock(f.ps)}
+  </article>`;
+
+/* ---------- Sélection : fiches 1 à 3 et 93 à 100 ---------- */
+const SELECTION = [1, 2, 3, 93, 94, 95, 96, 97, 98, 99, 100];
+const SEL_TITLE = "Fiches 1 à 3 et 93 à 100";
+const selFiches = () => SELECTION.map(n => FICHES[n - 1]);
+const selIds = () => [...new Set(selFiches().flatMap(f => [f.vf, f.sr, f.ps]))];
+function renderSelection() {
+  const ids = selIds(), mastered = ids.filter(id => level(id) === "mastered").length;
+  return `
+  <button class="back" data-act="home">‹ Accueil</button>
+  <h2>${SEL_TITLE}</h2>
+  <p class="muted">${SELECTION.length} fiches, soit ${ids.length} vérifications et questions. Tu en maîtrises ${mastered}.</p>
+  <div class="row">
+    <button class="btn" data-act="start-sel" id="start-sel">S'entraîner sur ces fiches</button>
+    <div class="seg"><button data-act="hide" aria-pressed="${browse.hide}" id="hide-sel">Masquer les réponses</button></div>
+  </div>
+  <div class="fiches">${selFiches().map(ficheCard).join("")}</div>`;
+}
+function startSel() { startSession("sel", shuffle(selIds())); }
 
 /* ---------- Rendu et événements ---------- */
 function render() {
@@ -653,7 +674,8 @@ function render() {
     view === "quiz" ? renderQuiz() :
     view === "result" ? renderResult() :
     view === "errors-empty" ? renderErrorsEmpty() :
-    view === "browse" ? renderBrowse() : renderHome();
+    view === "browse" ? renderBrowse() :
+    view === "selection" ? renderSelection() : renderHome();
 }
 
 $app.addEventListener("click", e => {
@@ -665,6 +687,8 @@ $app.addEventListener("click", e => {
     case "train": go("train"); break;
     case "errors": startErrors(); break;
     case "browse": go("browse"); break;
+    case "selection": go("selection"); break;
+    case "start-sel": startSel(); break;
     case "quit": go("home"); break;
     case "seg": {
       const g = el.dataset.group, raw = el.dataset.value, v = /^\d+$/.test(raw) ? +raw : raw;
@@ -679,7 +703,7 @@ $app.addEventListener("click", e => {
     case "self": if (session.picked === null) answer(el.dataset.ok === "1", -1); break;
     case "next": next(); break;
     case "retry-missed": startErrors(session.answers.filter(a => !a.ok).map(a => a.id)); break;
-    case "again": session.kind === "sim" ? startSim() : session.kind === "errors" ? startErrors() : startTrain(); break;
+    case "again": session.kind === "sim" ? startSim() : session.kind === "errors" ? startErrors() : session.kind === "sel" ? startSel() : startTrain(); break;
     case "hide": browse.hide = !browse.hide; render(); break;
     case "peek": el.classList.remove("hidden-ans"); el.removeAttribute("data-act"); break;
     case "reset": confirmReset = true; render(); document.getElementById("reset-no").focus(); break;
@@ -708,6 +732,7 @@ document.addEventListener("keydown", e => {
 
 function boot(data) {
   if (data && data.view) { view = data.view; session = data.session || null; train = data.train || train; browse = data.browse || browse; }
+  else if (location.hash === "#selection") view = "selection";
   if ((view === "quiz" || view === "result") && !session) view = "home";
   render();
 }
